@@ -44,6 +44,37 @@ st.markdown("""
 # -------------------------------
 #st.set_page_config(page_title="Stock Analysis & Monte Carlo Simulation", layout="wide")
 st.title("📈 Stock Analysis & Monte Carlo Simulation")
+def ichimoku(df):
+    high_9 = df['High'].rolling(window=9).max()
+    low_9 = df['Low'].rolling(window=9).min()
+    df['Tenkan_sen'] = (high_9 + low_9) / 2  # Conversion Line
+
+    high_26 = df['High'].rolling(window=26).max()
+    low_26 = df['Low'].rolling(window=26).min()
+    df['Kijun_sen'] = (high_26 + low_26) / 2  # Base Line
+
+    df['Senkou_Span_A'] = ((df['Tenkan_sen'] + df['Kijun_sen']) / 2).shift(26)  # Leading Span A
+
+    high_52 = df['High'].rolling(window=52).max()
+    low_52 = df['Low'].rolling(window=52).min()
+    df['Senkou_Span_B'] = ((high_52 + low_52) / 2).shift(26)  # Leading Span B
+
+    df['Chikou_Span'] = df['Close'].shift(-26)  # Lagging Span
+    return df
+
+def generate_signal(df):
+    signals = []
+    for i in range(1, len(df)):
+        if df['Tenkan_sen'][i] > df['Kijun_sen'][i] and df['Close'][i] > df['Senkou_Span_A'][i]:
+            signals.append("BUY")
+        elif df['Tenkan_sen'][i] < df['Kijun_sen'][i] and df['Close'][i] < df['Senkou_Span_A'][i]:
+            signals.append("SELL")
+        else:
+            signals.append("HOLD")
+    signals.insert(0, "HOLD")
+    df['Signal'] = signals
+    return df
+
 def get_google_news(company):
     search_url = f"https://www.google.com/search?q={company}+stock+news&hl=en&tbm=nws"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -231,6 +262,9 @@ if ticker_input:
     rsi(df)
     macd(df)
     moving_averages(df)
+    df.reset_index(inplace=True)
+    df =ichimoku(df)
+    df = generate_signal(df)
     metrics = {
         "CAGR (%)": CAGR(df) * 100,
         "Volatility (%)": vols,
@@ -401,6 +435,37 @@ st.write(f"Probability of being Bullish: {next_day_prediction[0][1]:.2f}")
 st.write(f"Probability of being Bearish: {1 - next_day_prediction[0][1]:.2f}")
 decision = make_decision(df)
 st.write(f"Decision: {decision}")
+
+#st.set_page_config(page_title="Ichimoku Cloud Analysis", page_icon="📈", layout="wide")
+
+# Now proceed with the rest of your code
+st.title("Ichimoku Cloud Stock Analysis")
+
+
+    
+st.write("### Stock Data with Ichimoku Indicators")
+st.dataframe(df[['Date', 'Close', 'Tenkan_sen', 'Kijun_sen', 'Senkou_Span_A', 'Senkou_Span_B', 'Chikou_Span', 'Signal']].tail(50))
+    
+st.write("### Ichimoku Cloud Chart")
+fig = go.Figure()
+fig.add_trace(go.Candlestick(x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='Price'))
+fig.add_trace(go.Scatter(x=df['Date'], y=df['Tenkan_sen'], mode='lines', name='Tenkan-sen', line=dict(color='blue')))
+fig.add_trace(go.Scatter(x=df['Date'], y=df['Kijun_sen'], mode='lines', name='Kijun-sen', line=dict(color='red')))
+fig.add_trace(go.Scatter(x=df['Date'], y=df['Senkou_Span_A'], mode='lines', name='Senkou Span A', fill='tonexty', line=dict(color='green')))
+fig.add_trace(go.Scatter(x=df['Date'], y=df['Senkou_Span_B'], mode='lines', name='Senkou Span B', fill='tonexty', line=dict(color='orange')))
+fig.add_trace(go.Scatter(x=df['Date'], y=df['Chikou_Span'], mode='lines', name='Chikou Span', line=dict(color='purple')))
+    
+fig.update_layout(title="Ichimoku Cloud Analysis", xaxis_title="Date", yaxis_title="Price", xaxis_rangeslider_visible=False)
+st.plotly_chart(fig)
+    
+last_signal = df['Signal'].iloc[-1]
+if last_signal == "BUY":
+    st.success("📈 Strong Buy Signal Detected! Consider Buying the Stock.")
+elif last_signal == "SELL":
+    st.error("📉 Sell Signal Detected! Consider Selling the Stock.")
+else:
+    st.warning("⚠ No Clear Signal. Hold Your Position.")
+
 st.write("### 📢 Sentiment Analysis Based on Google News")
 company_name = st.text_input("Enter Company Name for Sentiment Analysis:", "Tanla platforms")
 
