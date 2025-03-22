@@ -158,6 +158,66 @@ def get_stock_metrics(t):
     ow = pw / pl if pl > 0 else np.inf
     return beta, sharpe_ratio, treynor_ratio, jensen_alpha, cv, pl, pw, ow,vols
 
+def compute_rsi(data, period=14):
+    delta = data['Close'].diff(1)
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+def compute_stochastic_oscillator(data, period=14):
+    low_min = data['Low'].rolling(window=period).min()
+    high_max = data['High'].rolling(window=period).max()
+    stoch_k = ((data['Close'] - low_min) / (high_max - low_min)) * 100
+    return stoch_k
+
+def compute_bollinger_bands(data, period=20):
+    sma = data['Close'].rolling(window=period).mean()
+    std_dev = data['Close'].rolling(window=period).std()
+    upper_band = sma + (std_dev * 2)
+    lower_band = sma - (std_dev * 2)
+    return upper_band, lower_band
+
+def compute_atr(data, period=14):
+    high_low = data['High'] - data['Low']
+    high_close = np.abs(data['High'] - data['Close'].shift())
+    low_close = np.abs(data['Low'] - data['Close'].shift())
+    true_range = np.max([high_low, high_close, low_close], axis=0)
+    atr = pd.Series(true_range).rolling(window=period).mean()
+    return atr
+
+def compute_macd(data, short_period=12, long_period=26, signal_period=9):
+    short_ema = data['Close'].ewm(span=short_period, adjust=False).mean()
+    long_ema = data['Close'].ewm(span=long_period, adjust=False).mean()
+    macd = short_ema - long_ema
+    signal = macd.ewm(span=signal_period, adjust=False).mean()
+    return macd, signal
+
+def make_decision(data):
+    rsi = compute_rsi(data)
+    stoch_k = compute_stochastic_oscillator(data)
+    upper_band, lower_band = compute_bollinger_bands(data)
+    atr = compute_atr(data)
+    macd, signal = compute_macd(data)
+    
+    last_rsi = rsi.iloc[-1]
+    last_stoch = stoch_k.iloc[-1]
+    last_close = data['Close'].iloc[-1]
+    last_macd = macd.iloc[-1]
+    last_signal = signal.iloc[-1]
+    
+    buy_signal = (last_rsi < 30 and last_stoch < 20 and last_macd > last_signal)
+    sell_signal = (last_rsi > 70 and last_stoch > 80 and last_macd < last_signal)
+    
+    if buy_signal:
+        return "Buy now"
+    elif sell_signal:
+        return "Wait, price may go down"
+    else:
+        return "Hold"
+
 ticker_input = st.text_input("Enter Stock Ticker:", "TANLA.NS")
 
 if ticker_input:
@@ -339,6 +399,8 @@ next_day_data = data[['50_MA', '200_MA', 'RSI', 'MACD']].iloc[-1].values.reshape
 next_day_prediction = model.predict_proba(next_day_data)
 st.write(f"Probability of being Bullish: {next_day_prediction[0][1]:.2f}")
 st.write(f"Probability of being Bearish: {1 - next_day_prediction[0][1]:.2f}")
+decision = make_decision(df)
+st.write(f"Decision: {decision}")
 st.write("### 📢 Sentiment Analysis Based on Google News")
 company_name = st.text_input("Enter Company Name for Sentiment Analysis:", "Tanla platforms")
 
