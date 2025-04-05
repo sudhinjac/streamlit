@@ -258,6 +258,7 @@ if ticker_input:
     df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
     market_data, market_returns = get_market_data()
     beta, sharpe, treynor, jensen_alpha, cv, loss_prob, profit_prob, ow,vols = get_stock_metrics(ticker_input)
+    st.write(df.tail(5))
     bollinger_bands(df)
     rsi(df)
     macd(df)
