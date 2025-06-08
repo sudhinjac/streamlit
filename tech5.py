@@ -66,22 +66,23 @@ def get_google_news(company):
     for item in soup.find_all("div", class_="BNeawe vvjwJb AP7Wnd"):
         headlines.append(item.get_text())
     
-    return headlines[:30]  # Return top 10 news headlines
+    return headlines[:30]  # Top 30 headlines
 
 def analyze_sentiment(headlines):
     analyzer = SentimentIntensityAnalyzer()
-    sentiments = {"positive": 0, "neutral": 0, "negative": 0}
+    sentiments = {"Positive": 0, "Neutral": 0, "Negative": 0}
     
     for headline in headlines:
         score = analyzer.polarity_scores(headline)
         if score['compound'] >= 0.05:
-            sentiments["positive"] += 1
+            sentiments["Positive"] += 1
         elif score['compound'] <= -0.05:
-            sentiments["negative"] += 1
+            sentiments["Negative"] += 1
         else:
-            sentiments["neutral"] += 1
+            sentiments["Neutral"] += 1
     
     return sentiments
+
 
 def compute_rsi(data, period=14):
     delta = data['Close'].diff(1)
@@ -629,15 +630,27 @@ if ticker:
         company_name = st.text_input("Enter Company Name for Sentiment Analysis:", "Tanla platforms")
 
         if company_name:
-            news_headlines = get_google_news(company_name)
-            sentiments = analyze_sentiment(news_headlines)
-            
-            fig, ax = plt.subplots()
-            ax.pie(sentiments.values(), labels=sentiments.keys(), autopct='%1.1f%%', colors=['green', 'grey', 'red'])
-            ax.set_title(f"Sentiment Analysis for {company_name}")
-            
-            st.pyplot(fig)
-            
-            st.write("### Latest News Headlines")
-            for headline in news_headlines:
+          news_headlines = get_google_news(company_name)
+          sentiments = analyze_sentiment(news_headlines)
+
+        # Remove zero or NaN values before plotting
+          cleaned_sentiments = {k: v for k, v in sentiments.items() if pd.notna(v) and v > 0}
+        
+          st.write("### Latest News Headlines")
+          for headline in news_headlines:
                 st.write(f"- {headline}")
+
+          if not cleaned_sentiments:
+                st.warning("Not enough sentiment data to plot.")
+          else:
+                fig, ax = plt.subplots()
+                ax.pie(
+                    cleaned_sentiments.values(),
+                    labels=cleaned_sentiments.keys(),
+                    autopct='%1.1f%%',
+                    colors=['green', 'grey', 'red']
+                )
+                ax.set_title(f"Sentiment Analysis for {company_name}")
+                st.pyplot(fig)
+                st.write("### Latest News Headlines")
+         

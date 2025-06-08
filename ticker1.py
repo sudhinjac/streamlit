@@ -26,7 +26,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
 import requests
 from bs4 import BeautifulSoup
-
+import feedparser
 
 cf.go_offline()
 st.set_page_config(page_title="Stock Analysis & Monte Carlo Simulation", layout="wide")
@@ -76,29 +76,26 @@ def generate_signal(df):
     return df
 
 def get_google_news(company):
-    search_url = f"https://www.google.com/search?q={company}+stock+news&hl=en&tbm=nws"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(search_url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-    
-    headlines = []
-    for item in soup.find_all("div", class_="BNeawe vvjwJb AP7Wnd"):
-        headlines.append(item.get_text())
-    
-    return headlines[:30]  # Return top 10 news headlines
+    base_url = "https://news.google.com/rss/search?q="
+    query = company.replace(" ", "+") + "+stock"
+    url = base_url + query
+    feed = feedparser.parse(url)
+
+    headlines = [entry.title for entry in feed.entries[:10]]
+    return headlines
 
 def analyze_sentiment(headlines):
     analyzer = SentimentIntensityAnalyzer()
-    sentiments = {"positive": 0, "neutral": 0, "negative": 0}
+    sentiments = {"Positive": 0, "Neutral": 0, "Negative": 0}
     
     for headline in headlines:
         score = analyzer.polarity_scores(headline)
         if score['compound'] >= 0.05:
-            sentiments["positive"] += 1
+            sentiments["Positive"] += 1
         elif score['compound'] <= -0.05:
-            sentiments["negative"] += 1
+            sentiments["Negative"] += 1
         else:
-            sentiments["neutral"] += 1
+            sentiments["Neutral"] += 1
     
     return sentiments
 
@@ -470,16 +467,32 @@ else:
 st.write("### 📢 Sentiment Analysis Based on Google News")
 company_name = st.text_input("Enter Company Name for Sentiment Analysis:", "Tanla platforms")
 
+company_name = st.text_input("Enter Company Name for Sentiment Analysis:", "Tanla Platforms")
+
 if company_name:
     news_headlines = get_google_news(company_name)
-    sentiments = analyze_sentiment(news_headlines)
     
-    fig, ax = plt.subplots()
-    ax.pie(sentiments.values(), labels=sentiments.keys(), autopct='%1.1f%%', colors=['green', 'grey', 'red'])
-    ax.set_title(f"Sentiment Analysis for {company_name}")
-    
-    st.pyplot(fig)
-    
-    st.write("### Latest News Headlines")
-    for headline in news_headlines:
-        st.write(f"- {headline}")
+    if news_headlines:
+        sentiments = analyze_sentiment(news_headlines)
+        total = sum(sentiments.values())
+
+        if total > 0:
+            fig, ax = plt.subplots()
+            ax.pie(
+                sentiments.values(), 
+                labels=sentiments.keys(), 
+                autopct='%1.1f%%', 
+                colors=['green', 'grey', 'red'], 
+                startangle=90
+            )
+            ax.axis('equal')
+            ax.set_title(f"Sentiment Analysis for {company_name}")
+            st.pyplot(fig)
+        else:
+            st.warning("Sentiment analysis returned all zero values. Possibly insufficient data.")
+        
+        st.markdown("### 📰 Latest News Headlines")
+        for headline in news_headlines:
+            st.markdown(f"- {headline}")
+    else:
+        st.error("No news headlines found. Try a different company name or check your connection.")
