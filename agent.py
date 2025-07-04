@@ -60,7 +60,7 @@ if uploaded_file is not None:
                 continue
 
             drop_percent = ((high_1y - current_price) / high_1y) * 100
-            if drop_percent >= 35:
+            if drop_percent >= 10:
                 try:
                     stock = yf.Ticker(ticker)
                     info = stock.info
